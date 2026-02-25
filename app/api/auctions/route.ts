@@ -5,10 +5,10 @@ import { prisma } from "@/lib/prisma";
 import { authOptions } from "@/lib/auth";
 
 const schema = z.object({
-  itemName: z.string().min(1),
+  itemName: z.string().min(1).max(200).trim(),
   startingPrice: z.number().positive(),
   durationSeconds: z.number().int().min(10).max(86400), // 10s to 24h
-  description: z.string().optional(),
+  description: z.string().max(2000).optional(),
 });
 
 export async function POST(request: Request) {
@@ -40,6 +40,13 @@ export async function POST(request: Request) {
         currentPrice: startingPrice,
         endTime,
         creatorId: session.user.id,
+      },
+    });
+
+    await prisma.auctionSubscription.create({
+      data: {
+        userId: session.user.id,
+        auctionId: auction.id,
       },
     });
 

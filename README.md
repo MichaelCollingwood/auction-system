@@ -9,6 +9,10 @@ A real-time auction platform where users can create auctions and place bids. Bui
 - **Real-time Bidding**: Live bid updates via Upstash Realtime (SSE + Redis Streams)
 - **Anti-sniping**: Auctions extend by 30 seconds if a bid is placed in the last 30 seconds
 - **Bid History**: Most recent bids displayed in real-time
+- **Auction Subscriptions**: Subscribe to auctions for notifications
+- **Notifications**: In-app banner, email (Resend), and browser notifications
+- **Live Auction List**: Ended auctions disappear in real-time
+- **Search**: Search auctions with autocomplete
 
 ## Setup
 
@@ -37,6 +41,9 @@ Edit `.env` and set:
 - `UPSTASH_REDIS_REST_TOKEN` - From Upstash Console
 - `NEXTAUTH_URL` - Your app URL (e.g. `http://localhost:3000`)
 - `NEXTAUTH_SECRET` - Generate with `openssl rand -base64 32`
+- `RESEND_API_KEY` - For email notifications (optional)
+- `EMAIL_FROM` - Sender email for notifications (e.g. `notifications@yourdomain.com`)
+- `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` - For Web Push (out-of-browser notifications). Generate with `npx web-push generate-vapid-keys`. Also set `NEXT_PUBLIC_VAPID_PUBLIC_KEY` to the public key for the client.
 
 ### 3. Run database migrations
 
@@ -59,6 +66,9 @@ Open [http://localhost:3000](http://localhost:3000).
 | `/api/auctions` | POST | Required | Create auction |
 | `/api/auctions/[id]` | GET | Optional | Get auction state |
 | `/api/auctions/[id]/bid` | POST | Required | Place bid |
+| `/api/auctions/[id]/subscribe` | POST/DELETE | Required | Subscribe/unsubscribe |
+| `/api/auctions/search` | GET | Optional | Search auctions |
+| `/api/notifications` | GET | Required | List notifications |
 | `/api/realtime` | GET | Optional | SSE stream for real-time updates |
 
 ## Assumptions & Tradeoffs
@@ -81,8 +91,8 @@ Open [http://localhost:3000](http://localhost:3000).
 
 - Bid increment rules (e.g. minimum $1 increase)
 - Reserve price (hidden minimum)
-- Auction categories and search
-- Email notifications (outbid, auction ended)
+- Auction categories
+- Email notification preferences (opt-in/opt-out)
 - Rate limiting on bid endpoint
 - Scheduled job to end expired auctions and emit `auction.ended`
 - Image upload for auction items

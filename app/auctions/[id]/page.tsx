@@ -1,5 +1,7 @@
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
 import { LiveAuctionView } from "./live-auction-view";
 
 export default async function AuctionPage({
@@ -9,7 +11,9 @@ export default async function AuctionPage({
 }) {
   const { id } = await params;
 
-  const auction = await prisma.auction.findUnique({
+  const [session, auction] = await Promise.all([
+    getServerSession(authOptions),
+    prisma.auction.findUnique({
     where: { id },
     include: {
       creator: { select: { id: true, name: true, email: true } },
@@ -20,9 +24,20 @@ export default async function AuctionPage({
         include: { bidder: { select: { id: true, name: true, email: true } } },
       },
     },
-  });
+  }),
+  ]);
 
   if (!auction) notFound();
+
+  const subscription =
+    session?.user?.id
+      ? await prisma.auctionSubscription.findUnique({
+          where: {
+            userId_auctionId: { userId: session.user.id, auctionId: id },
+          },
+        })
+      : null;
+  const isSubscribed = !!subscription;
 
   const initialData = {
     id: auction.id,
@@ -32,6 +47,7 @@ export default async function AuctionPage({
     currentPrice: Number(auction.currentPrice),
     endTime: auction.endTime.toISOString(),
     status: auction.status,
+    serverTime: new Date().toISOString(),
     creator: auction.creator,
     highBidder: auction.highBidder,
     bidHistory: auction.bids.map((b) => ({
@@ -43,5 +59,11 @@ export default async function AuctionPage({
     })),
   };
 
-  return <LiveAuctionView auctionId={id} initialData={initialData} />;
+  return (
+    <LiveAuctionView
+      auctionId={id}
+      initialData={initialData}
+      isSubscribed={isSubscribed}
+    />
+  );
 }

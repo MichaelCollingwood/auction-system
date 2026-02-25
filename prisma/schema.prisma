@@ -8,30 +8,76 @@ datasource db {
 }
 
 model User {
+  id                   String                @id @default(cuid())
+  email                String                @unique
+  password             String
+  name                 String?
+  createdAt            DateTime              @default(now())
+  bids                 Bid[]
+  auctions             Auction[]
+  highBidderAuctions   Auction[]             @relation("HighBidder")
+  auctionSubscriptions AuctionSubscription[]
+  notifications        Notification[]
+  pushSubscriptions    PushSubscription[]
+}
+
+model PushSubscription {
   id        String   @id @default(cuid())
-  email     String   @unique
-  password  String
-  name      String?
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  endpoint  String
+  p256dh    String
+  auth      String
   createdAt DateTime @default(now())
-  bids      Bid[]
-  auctions  Auction[]
-  highBidderAuctions Auction[] @relation("HighBidder")
+
+  @@unique([userId, endpoint])
 }
 
 model Auction {
-  id            String        @id @default(cuid())
+  id            String                @id @default(cuid())
   itemName      String
   description   String?
-  startingPrice Decimal       @db.Decimal(12, 2)
-  currentPrice  Decimal       @db.Decimal(12, 2)
+  startingPrice Decimal               @db.Decimal(12, 2)
+  currentPrice  Decimal               @db.Decimal(12, 2)
   endTime       DateTime
-  status        AuctionStatus @default(ACTIVE)
-  createdAt     DateTime      @default(now())
+  status        AuctionStatus         @default(ACTIVE)
+  createdAt     DateTime              @default(now())
   creatorId     String
-  creator       User          @relation(fields: [creatorId], references: [id])
+  creator       User                  @relation(fields: [creatorId], references: [id])
   bids          Bid[]
   highBidderId  String?
-  highBidder    User?         @relation("HighBidder", fields: [highBidderId], references: [id])
+  highBidder    User?                 @relation("HighBidder", fields: [highBidderId], references: [id])
+  subscribers   AuctionSubscription[]
+}
+
+model AuctionSubscription {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  auctionId String
+  auction   Auction  @relation(fields: [auctionId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([userId, auctionId])
+}
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      NotificationType
+  title     String
+  message   String
+  link      String?
+  read      Boolean          @default(false)
+  createdAt DateTime         @default(now())
+}
+
+enum NotificationType {
+  NEW_BID
+  OUTBID
+  AUCTION_ENDED
+  YOU_WON
 }
 
 model Bid {

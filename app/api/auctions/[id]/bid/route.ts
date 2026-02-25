@@ -5,7 +5,7 @@ import { authOptions } from "@/lib/auth";
 import { processBid } from "@/lib/auction-actions";
 
 const schema = z.object({
-  amount: z.number().positive(),
+  amount: z.number().positive().finite(),
 });
 
 export async function POST(

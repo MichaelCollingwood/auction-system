@@ -13,6 +13,7 @@ type AuctionData = {
   currentPrice: number;
   endTime: string;
   status: string;
+  serverTime?: string;
   creator: { id: string; name: string | null; email: string };
   highBidder: { id: string; name: string | null; email: string } | null;
   bidHistory: {
@@ -27,15 +28,25 @@ type AuctionData = {
 type Props = {
   auctionId: string;
   initialData: AuctionData;
+  isSubscribed?: boolean;
 };
 
-export function LiveAuctionView({ auctionId, initialData }: Props) {
+export function LiveAuctionView({ auctionId, initialData, isSubscribed: initialSubscribed = false }: Props) {
   const { data: session, status: sessionStatus } = useSession();
   const [data, setData] = useState<AuctionData>(initialData);
+  const [isSubscribed, setIsSubscribed] = useState(initialSubscribed);
   const [bidAmount, setBidAmount] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [outbidBanner, setOutbidBanner] = useState(false);
+  const [shareCopied, setShareCopied] = useState(false);
+
+  const [serverTimeOffset, setServerTimeOffset] = useState(0);
+  useEffect(() => {
+    if (initialData.serverTime) {
+      setServerTimeOffset(new Date(initialData.serverTime).getTime() - Date.now());
+    }
+  }, [initialData.serverTime]);
 
   const isActive = data.status === "ACTIVE";
 
@@ -44,11 +55,12 @@ export function LiveAuctionView({ auctionId, initialData }: Props) {
     events: ["auction.bid", "auction.ended"],
     onData: useCallback(({ event, data: payload }: { event: string; data: unknown }) => {
       if (event === "auction.bid") {
-        const { amount, bidderId, bidderName, timestamp } = payload as {
+        const { amount, bidderId, bidderName, timestamp, endTime } = payload as {
           amount: number;
           bidderId: string;
           bidderName: string;
           timestamp: string;
+          endTime?: string;
         };
         setData((prev) => {
           const prevHighBidderId = prev.highBidder?.id;
@@ -59,6 +71,7 @@ export function LiveAuctionView({ auctionId, initialData }: Props) {
             ...prev,
             currentPrice: amount,
             highBidder: { id: bidderId, name: bidderName, email: "" },
+            ...(endTime && { endTime }),
             bidHistory: [
               {
                 id: crypto.randomUUID(),
@@ -106,7 +119,7 @@ export function LiveAuctionView({ auctionId, initialData }: Props) {
     const end = new Date(data.endTime).getTime();
 
     const update = () => {
-      const now = Date.now();
+      const now = Date.now() + serverTimeOffset;
       const remaining = Math.max(0, Math.floor((end - now) / 1000));
       setTimeLeft(remaining);
     };
@@ -114,11 +127,12 @@ export function LiveAuctionView({ auctionId, initialData }: Props) {
     update();
     const interval = setInterval(update, 1000);
     return () => clearInterval(interval);
-  }, [data.endTime, data.status]);
+  }, [data.endTime, data.status, serverTimeOffset]);
 
-  // Refetch when countdown hits 0 to get ENDED status (server ends expired auctions)
+  // When countdown hits 0: optimistically show winner immediately, then refetch to sync with server
   useEffect(() => {
     if (timeLeft === 0 && data.status === "ACTIVE") {
+      setData((prev) => ({ ...prev, status: "ENDED" }));
       fetch(`/api/auctions/${auctionId}`)
         .then((r) => r.json())
         .then((updated) => {
@@ -142,6 +156,11 @@ export function LiveAuctionView({ auctionId, initialData }: Props) {
     const amount = parseFloat(bidAmount);
     if (isNaN(amount) || amount <= data.currentPrice) {
       setError(`Bid must be higher than $${data.currentPrice.toFixed(2)}`);
+      setLoading(false);
+      return;
+    }
+    if (!/^\d+(\.\d{1,2})?$/.test(bidAmount.trim())) {
+      setError("Amount must have at most 2 decimal places");
       setLoading(false);
       return;
     }
@@ -193,9 +212,54 @@ export function LiveAuctionView({ auctionId, initialData }: Props) {
         </div>
       )}
 
-      <h1 className="text-2xl font-bold text-zinc-900 dark:text-zinc-50">
-        {data.itemName}
-      </h1>
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <h1 className="text-2xl font-bold text-zinc-900 dark:text-zinc-50">
+          {data.itemName}
+        </h1>
+        <div className="flex shrink-0 gap-2">
+          <button
+            type="button"
+            onClick={async () => {
+              const url = typeof window !== "undefined" ? `${window.location.origin}/auctions/${auctionId}` : "";
+              try {
+                if (navigator.share) {
+                  await navigator.share({ title: data.itemName, url });
+                } else {
+                  await navigator.clipboard.writeText(url);
+                  setShareCopied(true);
+                  setTimeout(() => setShareCopied(false), 2000);
+                }
+              } catch {
+                if (navigator.clipboard?.writeText) {
+                  await navigator.clipboard.writeText(url);
+                  setShareCopied(true);
+                  setTimeout(() => setShareCopied(false), 2000);
+                }
+              }
+            }}
+            className="rounded-md border border-zinc-300 px-3 py-1.5 text-sm dark:border-zinc-600"
+          >
+            {shareCopied ? "Copied!" : "Share"}
+          </button>
+          {sessionStatus === "authenticated" && data.status === "ACTIVE" && (
+          <button
+            type="button"
+            onClick={async () => {
+              const method = isSubscribed ? "DELETE" : "POST";
+              const res = await fetch(`/api/auctions/${auctionId}/subscribe`, { method });
+              if (res.ok) setIsSubscribed(!isSubscribed);
+            }}
+            className={`shrink-0 rounded-md px-3 py-1.5 text-sm font-medium ${
+              isSubscribed
+                ? "bg-zinc-200 text-zinc-700 dark:bg-zinc-700 dark:text-zinc-200"
+                : "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
+            }`}
+          >
+            {isSubscribed ? "Subscribed" : "Subscribe"}
+          </button>
+          )}
+        </div>
+      </div>
       {data.description && (
         <p className="mt-2 text-zinc-600 dark:text-zinc-400">{data.description}</p>
       )}

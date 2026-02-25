@@ -9,12 +9,25 @@ const schema = {
       bidderId: z.string(),
       bidderName: z.string().optional(),
       timestamp: z.string(),
+      endTime: z.string().optional(),
     }),
     ended: z.object({
       winnerId: z.string().optional(),
       winnerName: z.string().optional(),
       finalPrice: z.number(),
     }),
+  },
+  notification: {
+    alert: z.object({
+      id: z.string(),
+      type: z.string(),
+      title: z.string(),
+      message: z.string(),
+      link: z.string().optional(),
+    }),
+  },
+  auctionsList: {
+    auctionEnded: z.object({ auctionId: z.string() }),
   },
 };
 

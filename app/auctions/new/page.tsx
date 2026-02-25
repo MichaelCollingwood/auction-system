@@ -18,6 +18,23 @@ export default function NewAuctionPage() {
     setError("");
     setLoading(true);
 
+    const trimmedItemName = itemName.trim();
+    if (!trimmedItemName) {
+      setError("Item name is required");
+      setLoading(false);
+      return;
+    }
+    if (trimmedItemName.length > 200) {
+      setError("Item name must be at most 200 characters");
+      setLoading(false);
+      return;
+    }
+    if (description.length > 2000) {
+      setError("Description must be at most 2000 characters");
+      setLoading(false);
+      return;
+    }
+
     const price = parseFloat(startingPrice);
     const duration = parseInt(durationSeconds, 10);
 
@@ -36,8 +53,8 @@ export default function NewAuctionPage() {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        itemName,
-        description: description || undefined,
+        itemName: trimmedItemName,
+        description: description.trim() || undefined,
         startingPrice: price,
         durationSeconds: duration,
       }),
@@ -83,6 +100,7 @@ export default function NewAuctionPage() {
             type="text"
             value={itemName}
             onChange={(e) => setItemName(e.target.value)}
+            maxLength={200}
             required
             className="w-full rounded-md border border-zinc-300 px-3 py-2 text-zinc-900 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-50"
           />
@@ -98,6 +116,7 @@ export default function NewAuctionPage() {
             id="description"
             value={description}
             onChange={(e) => setDescription(e.target.value)}
+            maxLength={2000}
             rows={3}
             className="w-full rounded-md border border-zinc-300 px-3 py-2 text-zinc-900 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-50"
           />
